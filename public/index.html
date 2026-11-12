@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backend project: users</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { font-size: 1.4rem; font-weight: 500; }
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input { flex: 1; min-width: 140px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+  button { padding: 8px 12px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
+  button:hover { background: #f2f2f2; }
+  ul { list-style: none; padding: 0; }
+  li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid #eee; }
+  .muted { color: #777; font-size: 0.9rem; }
+  pre { background: #f6f6f6; padding: 10px; border-radius: 6px; white-space: pre-wrap; font-size: 0.85rem; }
+  .ok { color: #1a7f37; } .err { color: #c62828; }
+</style>
+</head>
+<body>
+  <h1>Users</h1>
+  <p class="muted">Each action sends a real request to your server. Watch your terminal to see which code ran.</p>
+
+  <form id="add">
+    <input id="name" placeholder="Name, e.g. Ali">
+    <input id="email" placeholder="Email, e.g. ali@example.com">
+    <button>Add user</button>
+  </form>
+
+  <ul id="list"></ul>
+
+  <h2 style="font-size:1rem;font-weight:500">Last request</h2>
+  <pre id="log">Nothing sent yet.</pre>
+
+  <script>
+    const log = document.getElementById("log");
+
+    async function call(method, path, body) {
+      const res = await fetch(path, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const text = await res.text();
+      log.innerHTML =
+        `${method} ${path}${body ? "\n" + JSON.stringify(body) : ""}\n\n` +
+        `<span class="${res.ok ? "ok" : "err"}">${res.status} ${res.statusText}</span>\n` +
+        (text || "(no body)");
+      return text ? JSON.parse(text) : null;
+    }
+
+    async function refresh() {
+      const res = await fetch("/users");
+      const users = await res.json();
+      const list = document.getElementById("list");
+      list.innerHTML = users.length ? "" : '<li class="muted">No users yet.</li>';
+      for (const u of users) {
+        const li = document.createElement("li");
+        li.innerHTML = `<span><span class="muted">#${u.id}</span> </span>`;
+        li.firstChild.append(`${u.name} `, Object.assign(document.createElement("span"), { className: "muted", textContent: u.email }));
+        const btn = document.createElement("button");
+        btn.textContent = "Delete";
+        btn.onclick = async () => { await call("DELETE", `/users/${u.id}`); refresh(); };
+        li.append(btn);
+        list.append(li);
+      }
+    }
+
+    document.getElementById("add").onsubmit = async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("name");
+      const email = document.getElementById("email");
+      const result = await call("POST", "/users", { name: name.value, email: email.value });
+      if (result && result.id) { name.value = ""; email.value = ""; }
+      refresh();
+    };
+
+    refresh();
+  </script>
+</body>
+</html>

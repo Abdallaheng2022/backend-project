@@ -1,0 +1,217 @@
+{
+  "info": {
+    "name": "Backend project: users API",
+    "description": "Requests for every route in backend-project. Run `npm run dev` first. Each request has tests (see the Tests or Scripts > Post-response tab), and the terminal running the server shows which code ran.\n\nRun the whole folder in order with the Collection Runner: it adds a user, lists users, deletes that user, then checks the error cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "userId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Health check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health",
+        "description": "Checks the server is running. Code path: app.js matches GET /health, then sendJson()."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('Status is ok', () => pm.expect(pm.response.json().status).to.eql('ok'));",
+              "pm.test('Uptime is a number', () => pm.expect(pm.response.json().uptime).to.be.a('number'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Add user",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Ali\",\n  \"email\": \"ali@example.com\"\n}"
+        },
+        "url": "{{baseUrl}}/users",
+        "description": "Adds a user. Code path: app.js readJsonBody() → users.js validateUser() → addUser() → users.set() → app.js sendJson(201). The new id is saved to the userId variable for the delete request."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+              "const user = pm.response.json();",
+              "pm.test('Returns the new user with an id', () => {",
+              "  pm.expect(user.id).to.be.a('number');",
+              "  pm.expect(user.name).to.eql('Ali');",
+              "  pm.expect(user.email).to.eql('ali@example.com');",
+              "});",
+              "pm.collectionVariables.set('userId', user.id);",
+              "console.log('Saved userId =', user.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. List users",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/users",
+        "description": "Lists all users. Code path: app.js matches GET /users → users.js listUsers() → app.js sendJson(200)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "const users = pm.response.json();",
+              "pm.test('Returns an array', () => pm.expect(users).to.be.an('array'));",
+              "const id = Number(pm.collectionVariables.get('userId'));",
+              "pm.test('Includes the user added in step 2', () => {",
+              "  pm.expect(users.some(u => u.id === id)).to.be.true;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Delete user",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/users/{{userId}}",
+        "description": "Deletes the user added in step 2. Code path: app.js matches DELETE /users/:id → users.js deleteUser() returns true → app.js sends 204."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));",
+              "pm.test('Body is empty', () => pm.expect(pm.response.text()).to.eql(''));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Delete same user again (404)",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/users/{{userId}}",
+        "description": "The user is already gone. Code path: users.js deleteUser() returns false → app.js sendJson(404)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+              "pm.test('Error says user not found', () => pm.expect(pm.response.json().error).to.eql('User not found'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Add user without name (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"\",\n  \"email\": \"x@y.com\"\n}" },
+        "url": "{{baseUrl}}/users",
+        "description": "Code path: users.js validateUser() fails → app.js sendJson(400). Nothing is saved."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+              "pm.test('Error mentions name', () => pm.expect(pm.response.json().error).to.eql(\"'name' is required\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Add user with bad email (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sara\",\n  \"email\": \"not-an-email\"\n}" },
+        "url": "{{baseUrl}}/users",
+        "description": "Code path: users.js validateUser() fails on the email check → app.js sendJson(400)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+              "pm.test('Error mentions email', () => pm.expect(pm.response.json().error).to.eql(\"'email' must be a valid email address\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Add user with invalid JSON (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"name\": \"Ali\", oops" },
+        "url": "{{baseUrl}}/users",
+        "description": "Code path: app.js readJsonBody() → JSON.parse fails → sendJson(400). users.js is never called."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+              "pm.test('Error says invalid JSON', () => pm.expect(pm.response.json().error).to.eql('Invalid JSON'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Unknown route (404)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/nope",
+        "description": "Code path: app.js matches no route → sendJson(404)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+              "pm.test('Error says not found', () => pm.expect(pm.response.json().error).to.eql('Not found'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
